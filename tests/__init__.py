@@ -1,0 +1,3 @@
+"""
+SignSyntax - Test Suite Initialization
+"""

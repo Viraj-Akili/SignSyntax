@@ -1,0 +1,69 @@
+; ==============================================================================
+; SignSyntax - Phase 1 Formal Grammar Specification (BNF)
+; NOTE: This is a formal specification for Phase 1 language design,
+;       NOT an implemented parser.
+; ==============================================================================
+
+<Sentence> ::= <DeclarativeSentence> | <Question>
+
+<DeclarativeSentence> ::= <TimeMarker>? <Subject> <VerbPhrase> <Negation>?
+
+<VerbPhrase> ::= <Verb> | <Verb> <Object> | <Verb> <Object> <Adjective>
+
+<Question> ::= <WHQuestion>
+
+<WHQuestion> ::= <WHWord> <Subject> <VerbPhrase>
+               | <WHWord> <Object>
+
+<TimeMarker> ::= YESTERDAY
+               | TODAY
+               | TOMORROW
+               | NOW
+               | MORNING
+               | NIGHT
+
+<Subject> ::= <Pronoun>
+
+<Pronoun> ::= ME
+            | YOU
+            | HE
+            | SHE
+            | WE
+            | THEY
+
+<Verb> ::= WANT
+         | HAVE
+         | LIKE
+         | GO
+         | COME
+         | EAT
+         | DRINK
+         | SEE
+         | READ
+         | NEED
+
+<Object> ::= MILK
+            | WATER
+            | FOOD
+            | BOOK
+            | HOME
+            | SCHOOL
+            | FRIEND
+            | PHONE
+            | MONEY
+            | CAR
+
+<Adjective> ::= HAPPY
+              | SAD
+              | GOOD
+              | BAD
+              | BIG
+              | SMALL
+
+<WHWord> ::= WHAT
+           | WHERE
+           | WHO
+           | WHEN
+           | WHY
+
+<Negation> ::= NOT
