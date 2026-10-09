@@ -77,6 +77,11 @@ def extract_sequence_features(frames: Union[List[List[float]], np.ndarray]) -> n
             f"Expected frame feature dimension of {FEATURE_DIM_PER_FRAME}, got shape {arr.shape}."
         )
 
+    # Filter out hand-absent (all-zero) frames so mean and std reflect only valid hand-present frames
+    non_zero_mask = np.any(arr != 0.0, axis=1)
+    if np.any(non_zero_mask):
+        arr = arr[non_zero_mask]
+
     # Calculate mean and standard deviation along temporal axis (axis 0)
     mean_vec = np.mean(arr, axis=0)  # Shape: (126,)
 

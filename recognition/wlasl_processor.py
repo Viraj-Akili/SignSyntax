@@ -229,9 +229,13 @@ def process_video_frames(
     frame_start: int = 1,
     frame_end: int = -1,
     max_frames: Optional[int] = None,
+    require_hands: bool = True,
 ) -> Tuple[List[List[float]], float, int]:
     """
     Processes an input video file, extracting 126-dimensional multi-hand landmarks for each frame.
+
+    When require_hands=True (default), frames with no detected hands are NOT appended,
+    preventing hand-absent zero frames from corrupting temporal feature statistics.
 
     Args:
         video_path (str): Path to the video file (e.g. MP4, AVI).
@@ -239,6 +243,7 @@ def process_video_frames(
         frame_start (int): 1-based start frame index (WLASL annotation standard).
         frame_end (int): 1-based end frame index (-1 means until end of video).
         max_frames (Optional[int]): Maximum number of frames to process.
+        require_hands (bool): If True, discards frames where no hands are detected.
 
     Returns:
         Tuple[List[List[float]], float, int]:
@@ -284,8 +289,9 @@ def process_video_frames(
 
             # Extract hand landmarks without drawing for speed
             hands, _ = tracker.process_frame(frame, draw=False)
-            frame_vector = format_frame_landmarks(hands)
-            frames.append(frame_vector)
+            if len(hands) > 0 or not require_hands:
+                frame_vector = format_frame_landmarks(hands)
+                frames.append(frame_vector)
 
             if max_frames and len(frames) >= max_frames:
                 break
@@ -308,6 +314,7 @@ def process_video_file_to_sample(
     source_url: str = "",
     signer_id: int = 0,
     tracker: Optional[HandTracker] = None,
+    require_hands: bool = True,
 ) -> LandmarkSequenceSample:
     """
     Processes a video file and bundles the extracted landmarks into a LandmarkSequenceSample.
@@ -323,6 +330,7 @@ def process_video_file_to_sample(
         source_url (str): Source URL.
         signer_id (int): Signer ID.
         tracker (Optional[HandTracker]): MediaPipe hand tracker.
+        require_hands (bool): If True, discards frames where no hands are detected.
 
     Returns:
         LandmarkSequenceSample: Structured sequence sample with ordered 126-dim frames.
@@ -337,6 +345,7 @@ def process_video_file_to_sample(
         tracker=tracker,
         frame_start=frame_start,
         frame_end=frame_end,
+        require_hands=require_hands,
     )
 
     return LandmarkSequenceSample(
@@ -386,6 +395,7 @@ def process_and_save_video(
     source_url: str = "",
     signer_id: int = 0,
     tracker: Optional[HandTracker] = None,
+    require_hands: bool = True,
 ) -> Tuple[LandmarkSequenceSample, str]:
     """
     Processes a video file and saves the resulting LandmarkSequenceSample JSON to output directory.
@@ -402,6 +412,7 @@ def process_and_save_video(
         source_url (str): Source URL.
         signer_id (int): Signer ID.
         tracker (Optional[HandTracker]): Hand tracker instance.
+        require_hands (bool): If True, discards frames where no hands are detected.
 
     Returns:
         Tuple[LandmarkSequenceSample, str]: Created sample object and saved JSON file path.
@@ -417,6 +428,7 @@ def process_and_save_video(
         source_url=source_url,
         signer_id=signer_id,
         tracker=tracker,
+        require_hands=require_hands,
     )
 
     out_path = get_sequence_output_path(gloss, sample.video_id, base_dir=output_dir)

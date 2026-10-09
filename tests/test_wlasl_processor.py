@@ -363,10 +363,12 @@ def test_process_video_frames_with_synthetic_video():
         video_path = os.path.join(tmpdir, "test_sign.mp4")
         _create_synthetic_video_file(video_path, num_frames=10)
 
+        # When require_hands=False, all frames are preserved
         frames, fps, total_frames = process_video_frames(
             video_path=video_path,
             frame_start=1,
             frame_end=8,
+            require_hands=False,
         )
 
         assert len(frames) == 8
@@ -375,6 +377,15 @@ def test_process_video_frames_with_synthetic_video():
         # Each frame vector must be exactly 126 elements
         for fvec in frames:
             assert len(fvec) == 126
+
+        # When require_hands=True (default), hand-absent blank frames are skipped
+        frames_filtered, _, _ = process_video_frames(
+            video_path=video_path,
+            frame_start=1,
+            frame_end=8,
+            require_hands=True,
+        )
+        assert len(frames_filtered) == 0
 
 
 def test_process_and_save_video_synthetic_pipeline():
@@ -392,6 +403,7 @@ def test_process_and_save_video_synthetic_pipeline():
             output_dir=out_dir,
             frame_start=1,
             frame_end=5,
+            require_hands=False,
         )
 
         assert sample.gloss == "HOME"

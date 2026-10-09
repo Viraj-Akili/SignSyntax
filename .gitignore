@@ -33,3 +33,4 @@ dataset/wlasl_sequences/
 
 # Temporary files
 *.log
+scratch/

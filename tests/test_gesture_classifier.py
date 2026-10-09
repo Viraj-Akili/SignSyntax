@@ -292,3 +292,99 @@ def test_gesture_predictor_integration_error_on_unknown_gloss():
         dummy_frames = [[0.0] * 126 for _ in range(3)]
         with pytest.raises(GestureIntegrationError, match="Integration Error"):
             predictor.predict_sequence(dummy_frames)
+
+
+def test_gesture_prediction_result_vote_counts_safe_default():
+    """Verifies that GesturePredictionResult safely provides vote_counts by default."""
+    res = GesturePredictionResult(
+        predicted_gloss="BOOK",
+        confidence=0.8,
+        token_type="NOUN",
+        meaning="book",
+        nearest_neighbors=[("BOOK", 0.1), ("BOOK", 0.2), ("MILK", 0.5)],
+    )
+    assert hasattr(res, "vote_counts")
+    assert isinstance(res.vote_counts, dict)
+    assert res.vote_counts == {}
+    assert res.predicted_gloss == "BOOK"
+    assert res.confidence == 0.8
+    assert len(res.nearest_neighbors) == 3
+
+
+def test_gesture_predictor_predict_single_and_vote_counts():
+    """Verifies that predict_single and predict_sequence accurately populate vote_counts and features."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        X_train = np.array([
+            [1.0] * 252,
+            [1.1] * 252,
+            [5.0] * 252,
+        ], dtype=np.float32)
+        y_train = ["BOOK", "BOOK", "MILK"]
+        clf = KNearestNeighborsClassifier(k=3).fit(X_train, y_train, scale=False)
+
+        model_path = os.path.join(tmpdir, "model.json")
+        clf.save(model_path, pkl_path=None)
+
+        predictor = GesturePredictor(model_path=model_path, symbol_table=SymbolTable())
+
+        # Test predict_single directly with feature vector
+        test_feat = np.array([1.05] * 252, dtype=np.float32)
+        res_single = predictor.predict_single(test_feat)
+
+        assert res_single.predicted_gloss == "BOOK"
+        assert res_single.token_type == "NOUN"
+        assert res_single.vote_counts == {"BOOK": 2, "MILK": 1}
+        assert res_single.features is not None
+        assert len(res_single.nearest_neighbors) == 3
+
+        # Test predict_sequence with synthetic frames
+        dummy_frames = [[1.05] * 126 for _ in range(5)]
+        res_seq = predictor.predict_sequence(dummy_frames)
+
+        assert res_seq.predicted_gloss == "BOOK"
+        assert isinstance(res_seq.vote_counts, dict)
+        assert res_seq.vote_counts.get("BOOK") == 2
+        assert res_seq.vote_counts.get("MILK") == 1
+        assert res_seq.features is not None
+
+
+def test_gesture_predictor_closed_set_prediction():
+    """Verifies closed-set behavior: predictor deterministically classifies to nearest prototype and never returns UNKNOWN."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Train a toy model with prototype centered around 1.0
+        X_train = np.array([
+            [1.0] * 252,
+            [1.1] * 252,
+            [1.2] * 252,
+        ], dtype=np.float32)
+        y_train = ["BOOK", "BOOK", "BOOK"]
+        clf = KNearestNeighborsClassifier(k=3).fit(X_train, y_train, scale=False)
+
+        model_path = os.path.join(tmpdir, "model.json")
+        clf.save(model_path, pkl_path=None)
+
+        predictor = GesturePredictor(model_path=model_path)
+
+        # 1. In-distribution input -> predicts BOOK
+        in_distribution = np.array([1.05] * 252, dtype=np.float32)
+        res_ok = predictor.predict_single(in_distribution)
+        assert res_ok.predicted_gloss == "BOOK"
+        assert res_ok.token_type == "NOUN"
+        assert res_ok.is_recognized is True
+
+        # 2. Far input -> closed-set still predicts nearest class (BOOK), NEVER UNKNOWN
+        far_input = np.array([50.0] * 252, dtype=np.float32)
+        res_far = predictor.predict_single(far_input)
+        assert res_far.predicted_gloss == "BOOK"
+        assert res_far.predicted_gloss != "UNKNOWN"
+        assert res_far.token_type == "NOUN"
+        assert res_far.is_recognized is True
+
+        # 3. Synthetic frames in predict_sequence -> closed-set predicts BOOK, NEVER UNKNOWN
+        zero_frames = [[0.0] * 126 for _ in range(5)]
+        res_zero = predictor.predict_sequence(zero_frames)
+        assert res_zero.predicted_gloss == "BOOK"
+        assert res_zero.predicted_gloss != "UNKNOWN"
+        assert res_zero.is_recognized is True
+
+
